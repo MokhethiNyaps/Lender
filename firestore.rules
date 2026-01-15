@@ -1,0 +1,209 @@
+/**
+ * Core Philosophy:
+ * This ruleset enforces a hybrid security model tailored for the Lenda application.
+ * It combines strict user-ownership for personal data with a flexible, role-based
+ * collaborative model for shared lending contexts (Solos and Groups). The primary
+ * goal is to ensure users can only access data they own or are explicitly members of.
+ *
+ * Data Structure:
+ * - /users/{userId}/*: A hierarchical structure where a user's private data, such
+ *   as their profile, is nested directly under their unique user ID. This enables
+ *   simple, path-based ownership rules.
+ * - /solos/{soloId}, /groups/{groupId}: Top-level collections for collaborative
+ *   lending contexts. Authorization is managed via a denormalized `members` map
+ *   on each document, allowing for efficient, independent access checks.
+ * - /roles_admin/{userId}: A simple lookup collection where the existence of a
+ *   document signifies that the user has global administrative privileges.
+ *
+ * Key Security Decisions:
+ * - Denormalization for Authorization: To ensure performant and secure access
+ *   control, collaborative documents (/solos, /groups) contain a `members` map
+ *   (e.g., `{ "uid1": "owner", "uid2": "member" }`). This avoids slow and costly
+ *   `get()` or `exists()` calls to other collections within rules.
+ * - Strict Ownership: All data under the /users/{userId} path is strictly
+ *   controlled by the user whose ID matches the path segment. User enumeration
+ *   (listing the top-level /users collection) is explicitly disallowed.
+ * - Admin Privileges: A separate `/roles_admin` collection is used to grant
+ *   global admin rights. This provides a clear and secure way to manage elevated
+ *   permissions without cluttering user documents.
+ * - Prototyping Flexibility: These rules focus on "who can access what"
+ *   (authorization) but intentionally do not validate the specific shape or
+ *   data types of documents (schema validation). This allows for rapid
+ *   application development and iteration.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----------------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------------
+
+    /**
+     * Returns true if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Returns true if the authenticated user's UID matches the provided userId.
+     * This is the foundation of the user-ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Returns true if the resource being operated on already exists in Firestore.
+     * Crucial for preventing updates or deletes on non-existent documents.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * A convenience function that combines an ownership check with an existence check.
+     * Used for secure update and delete operations on user-owned documents.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+
+    /**
+     * Returns true if the user has an entry in the global admin collection.
+     * This check is used for granting elevated permissions across the database.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * Checks if a user's UID is a key in a document's `members` map.
+     * `doc` can be `resource` for existing documents or `request.resource` for new ones.
+     */
+    function isMember(doc) {
+      return isSignedIn() && request.auth.uid in doc.data.members;
+    }
+
+    /**
+     * Checks if a user is a member with one of the specified roles.
+     * Used for role-based access control within collaborative documents.
+     */
+    function isMemberWithRole(doc, roles) {
+      return isMember(doc) && doc.data.members[request.auth.uid] in roles;
+    }
+
+    // ----------------------------------------------------------------------
+    // User Data Collections
+    // ----------------------------------------------------------------------
+
+    /**
+     * @description Users can create their own user document and can read, update, or
+     *              delete it. No other user can access it.
+     * @path        /users/{userId}
+     * @allow       (create) A new user signs up and creates their own record: `auth.uid == userId`.
+     * @deny        (read) A user tries to read another user's document: `auth.uid != userId`.
+     * @principle   Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // Explicitly prevent listing/querying all users.
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description A user can manage their own profile documents. Access is inherited
+       *              from the parent user document.
+       * @path        /users/{userId}/userProfiles/{userProfileId}
+       * @allow       (read) A user reads their own profile: `auth.uid == userId`.
+       * @deny        (write) A user tries to create a profile for someone else: `auth.uid != userId`.
+       * @principle   Enforces document ownership for all subcollection operations.
+       */
+      match /userProfiles/{userProfileId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    // ----------------------------------------------------------------------
+    // Administrative and Global Collections
+    // ----------------------------------------------------------------------
+
+    /**
+     * @description A read-only collection for identifying administrators. The existence
+     *              of a document grants admin rights. No client can modify this collection.
+     * @path        /roles_admin/{userId}
+     * @allow       (read) An admin function checks if a user is an admin: `exists(...)`.
+     * @deny        (write) Any user attempts to make themselves an admin: `create`, `update`, `delete`.
+     * @principle   Segregates administrative roles into a secure, client-immutable collection.
+     */
+    match /roles_admin/{userId} {
+      allow get, list: if isAdmin();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description This collection links users to roles. A user can only manage their own
+     *              role context documents.
+     * @path        /user_role_contexts/{userRoleContextId}
+     * @allow       (create) A user creates a role context for themselves: `request.resource.data.userId == auth.uid`.
+     * @deny        (update) A user tries to modify a role context for another user.
+     * @principle   Enforces self-management of relational "join" documents.
+     */
+    match /user_role_contexts/{userRoleContextId} {
+      allow get: if isExistingDoc() && (isOwner(resource.data.userId) || isAdmin());
+      // `list` is allowed for any signed-in user, but the client application MUST
+      // apply a `where('userId', '==', auth.uid)` filter to securely fetch data.
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isExistingDoc() && (isOwner(resource.data.userId) || isAdmin());
+      allow delete: if isExistingDoc() && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // ----------------------------------------------------------------------
+    // Collaborative Data Collections (Solo & Group)
+    // ----------------------------------------------------------------------
+
+    /**
+     * @description Access to a solo lending context is controlled by a `members` map on the
+     *              document. Users can read contexts they are members of. Owners can manage and delete.
+     * @path        /solos/{soloId}
+     * @allow       (read) A user who is in the `members` map reads the document.
+     * @deny        (delete) A user who is a 'member' but not an 'owner' tries to delete the document.
+     * @principle   Uses a denormalized `members` map for performant, role-based collaborative access.
+     */
+    match /solos/{soloId} {
+      allow get: if isMember(resource);
+      // `list` is allowed for any signed-in user, but the client application MUST
+      // apply a query filter (e.g., where(`members.${auth.uid}`, '!=', null)) to securely fetch data.
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == 'owner';
+      allow update: if isExistingDoc() && isMemberWithRole(resource, ['owner', 'admin']);
+      allow delete: if isExistingDoc() && isMemberWithRole(resource, ['owner']);
+    }
+
+    /**
+     * @description Access to a group lending context is controlled by a `members` map, identical
+     *              to the /solos collection.
+     * @path        /groups/{groupId}
+     * @allow       (create) A user creates a new group and is automatically assigned as the 'owner' in the `members` map.
+     * @deny        (update) A non-member attempts to change the group's details.
+     * @principle   Uses a denormalized `members` map for performant, role-based collaborative access.
+     */
+    match /groups/{groupId} {
+      allow get: if isMember(resource);
+      // `list` is allowed for any signed-in user, but the client application MUST
+      // apply a query filter (e.g., where(`members.${auth.uid}`, '!=', null)) to securely fetch data.
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == 'owner';
+      allow update: if isExistingDoc() && isMemberWithRole(resource, ['owner', 'admin']);
+      allow delete: if isExistingDoc() && isMemberWithRole(resource, ['owner']);
+    }
+  }
+}

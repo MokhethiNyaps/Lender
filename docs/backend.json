@@ -1,0 +1,269 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user within the Lenda application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user was last updated.",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "Reference to the user who created this user (e.g., an admin). (Relationship: User 1:N User)"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "createdBy"
+      ]
+    },
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents extended profile information for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User entity. (Relationship: User 1:1 UserProfile)"
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "User's phone number."
+        }
+      },
+      "required": [
+        "id",
+        "userId"
+      ]
+    },
+    "Role": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Role",
+      "type": "object",
+      "description": "Represents a role a user can have within a specific lending context.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Role entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the role (e.g., Owner, Admin, Member)."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "UserRoleContext": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserRoleContext",
+      "type": "object",
+      "description": "Links a user to a role within a specific lending context (Solo or Group).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the UserRoleContext entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User entity. (Relationship: User 1:N UserRoleContext)"
+        },
+        "roleId": {
+          "type": "string",
+          "description": "Reference to the Role entity. (Relationship: Role 1:N UserRoleContext)"
+        },
+        "soloId": {
+          "type": "string",
+          "description": "Reference to a Solo lending context, if applicable. (Relationship: Solo 1:N UserRoleContext)"
+        },
+        "groupId": {
+          "type": "string",
+          "description": "Reference to a Group lending context, if applicable. (Relationship: Group 1:N UserRoleContext)"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "roleId"
+      ]
+    },
+    "Solo": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Solo",
+      "type": "object",
+      "description": "Represents a solo lending context.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Solo entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the solo lending context."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "Group": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Group",
+      "type": "object",
+      "description": "Represents a group lending context (e.g., Stokvel).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Group entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the group."
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Represents a user.  Top-level collection for user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/userProfiles/{userProfileId}",
+        "definition": {
+          "entityName": "UserProfile",
+          "schema": {
+            "$ref": "#/backend/entities/UserProfile"
+          },
+          "description": "Represents a user profile. Subcollection of users.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "userProfileId",
+              "description": "The unique identifier for the user profile."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "Role",
+          "schema": {
+            "$ref": "#/backend/entities/Role"
+          },
+          "description": "Collection to store administrator roles. Existence of a document for a user in this collection implies admin privileges.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the admin user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/solos/{soloId}",
+        "definition": {
+          "entityName": "Solo",
+          "schema": {
+            "$ref": "#/backend/entities/Solo"
+          },
+          "description": "Represents a solo lending context. Includes denormalized 'members' map for authorization independence.",
+          "params": [
+            {
+              "name": "soloId",
+              "description": "The unique identifier for the solo lending context."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/groups/{groupId}",
+        "definition": {
+          "entityName": "Group",
+          "schema": {
+            "$ref": "#/backend/entities/Group"
+          },
+          "description": "Represents a group lending context (e.g., Stokvel). Includes denormalized 'members' map for authorization independence.",
+          "params": [
+            {
+              "name": "groupId",
+              "description": "The unique identifier for the group."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/user_role_contexts/{userRoleContextId}",
+        "definition": {
+          "entityName": "UserRoleContext",
+          "schema": {
+            "$ref": "#/backend/entities/UserRoleContext"
+          },
+          "description": "Links users to specific roles within either a Solo or a Group lending context.",
+          "params": [
+            {
+              "name": "userRoleContextId",
+              "description": "The unique identifier for the user role context."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support Lenda's core features with a focus on security, scalability, and debuggability. It adheres to the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters).  Authorization Independence is achieved by denormalizing role information into documents where authorization is required, avoiding `get()` calls in security rules. Structural Segregation is applied by separating data with different access needs into distinct collections. Access Modeling follows a consistent pattern of using hierarchical paths for user-owned data and membership maps for collaborative data.\n\nSpecifically:\n\n*   `/users/{userId}` and `/users/{userId}/userProfiles/{userProfileId}`:  Uses path-based ownership for user data. This structure simplifies security rules based on user identity.\n*   `/solos/{soloId}`: Represents individual lending contexts. The `members` map is denormalized into each document, enabling authorization independence for solo-related operations. Security rules can directly check membership without needing to fetch parent document data.\n*   `/groups/{groupId}`: Represents group lending contexts.  Similar to Solos, a `members` map is denormalized into each group document. This allows security rules to efficiently validate membership for group-related operations.\n*   `/roles_admin/{userId}`: Represents a user with admin privileges. An existence check is sufficient for global admin privileges.\n*   `/user_role_contexts/{userRoleContextId}`: Represents the roles a user has in the group or solo context.\n\nThis structure supports QAPs by enabling secure `list` operations. For example, listing solos or groups only requires checking the `members` map in each document against the requesting user's ID, without needing to filter based on data content."
+  }
+}
