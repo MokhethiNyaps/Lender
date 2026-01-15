@@ -1,16 +1,6 @@
 'use client';
 
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarInset,
-  SidebarTrigger,
-  SidebarFooter,
-} from '@/components/ui/sidebar';
 import Logo from '@/components/logo';
-import { MainNav } from '@/components/main-nav';
 import { UserNav } from '@/components/user-nav';
 import { ContextSwitcher } from '@/components/context-switcher';
 import Link from 'next/link';
@@ -20,12 +10,13 @@ import {
   Users,
   BarChart3,
   UserCircle,
-  PanelLeft,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useUser } from '@/firebase';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 const bottomNavLinks = [
   { href: '/dashboard', label: 'Home', icon: Home },
@@ -56,7 +47,7 @@ function BottomNavBar() {
               )}
             >
               <link.icon className="h-6 w-6" />
-              <span className="sr-only">{link.label}</span>
+              <span>{link.label}</span>
             </Link>
           );
         })}
@@ -71,28 +62,38 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const isMobile = useIsMobile();
+  const { user, isUserLoading } = useUser();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.replace('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  if (isUserLoading || !user) {
+    return (
+       <div className="flex h-screen w-full items-center justify-center">
+          <div className="h-16 w-16 animate-spin rounded-full border-4 border-dashed border-primary"></div>
+       </div>
+    );
+  }
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader className="p-4">
-          <Logo />
-        </SidebarHeader>
-        <SidebarContent>
-          <ContextSwitcher />
-          <MainNav />
-        </SidebarContent>
-        <SidebarFooter className="p-4">{/* Can add footer items here */}</SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
-          <SidebarTrigger className="md:hidden" />
+    <div className="flex min-h-screen w-full flex-col">
+       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
           <div className="hidden md:block">
+            <Logo />
+          </div>
+          <div className="md:hidden">
             <ContextSwitcher />
           </div>
           <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
             <div className="ml-auto flex-1 sm:flex-initial">
               {/* Maybe a global search here */}
+            </div>
+            <div className="hidden md:block">
+              <ContextSwitcher />
             </div>
             <UserNav />
           </div>
@@ -101,7 +102,6 @@ export default function DashboardLayout({
           {children}
         </main>
         {isMobile && <BottomNavBar />}
-      </SidebarInset>
-    </SidebarProvider>
+    </div>
   );
 }

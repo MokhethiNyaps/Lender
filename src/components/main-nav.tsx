@@ -1,3 +1,4 @@
+// This file is no longer used for primary navigation and can be removed or repurposed.
 "use client";
 
 import Link from "next/link";
@@ -28,7 +29,7 @@ export function MainNav({ className, ...props }: React.HTMLAttributes<HTMLElemen
           href={link.href}
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2 text-sidebar-foreground transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            (pathname === link.href || (link.href !== "/dashboard" && pathname.startsWith(link.href))) && "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+            (pathname === link.href || (pathname !== "/" && link.href !== "/dashboard" && pathname.startsWith(link.href))) && "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
           )}
         >
           <link.icon className="h-4 w-4" />
