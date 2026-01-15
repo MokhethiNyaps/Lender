@@ -37,7 +37,11 @@ export function setDocumentNonBlocking(docRef: DocumentReference, data: any, opt
  * Returns the Promise for the new doc ref, but typically not awaited by caller.
  */
 export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
-  const promise = addDoc(colRef, data)
+  // IMPORTANT: We do not await this promise. The caller should not await it either.
+  // The purpose is to fire-and-forget from the UI's perspective.
+  // The optimistic update will happen in the local cache.
+  // Error handling is done via the global emitter.
+  addDoc(colRef, data)
     .catch(error => {
       errorEmitter.emit(
         'permission-error',
@@ -48,7 +52,6 @@ export function addDocumentNonBlocking(colRef: CollectionReference, data: any) {
         })
       )
     });
-  return promise;
 }
 
 

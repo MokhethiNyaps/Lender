@@ -147,6 +147,18 @@
         "name": {
           "type": "string",
           "description": "Name of the group."
+        },
+        "description": {
+          "type": "string",
+          "description": "A short description of the group."
+        },
+         "members": {
+            "type": "object",
+            "description": "A map of user UIDs to their roles within the group for easy access control.",
+            "additionalProperties": {
+                "type": "string",
+                "enum": ["owner", "admin", "member"]
+            }
         }
       },
       "required": [

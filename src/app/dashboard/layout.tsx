@@ -17,6 +17,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { ActiveContextProvider } from '@/app/dashboard/active-context-provider';
 
 const bottomNavLinks = [
   { href: '/dashboard', label: 'Home', icon: Home },
@@ -80,28 +81,30 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-col">
-       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
-          <div className="hidden md:block">
-            <Logo />
-          </div>
-          <div className="md:hidden">
-            <ContextSwitcher />
-          </div>
-          <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
-            <div className="ml-auto flex-1 sm:flex-initial">
-              {/* Maybe a global search here */}
-            </div>
+    <ActiveContextProvider>
+      <div className="flex min-h-screen w-full flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
             <div className="hidden md:block">
+              <Logo />
+            </div>
+            <div className="md:hidden">
               <ContextSwitcher />
             </div>
-            <UserNav />
-          </div>
-        </header>
-        <main className="flex flex-1 flex-col gap-4 bg-secondary/50 p-4 pb-20 md:gap-8 md:p-8">
-          {children}
-        </main>
-        {isMobile && <BottomNavBar />}
-    </div>
+            <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
+              <div className="ml-auto flex-1 sm:flex-initial">
+                {/* Maybe a global search here */}
+              </div>
+              <div className="hidden md:block">
+                <ContextSwitcher />
+              </div>
+              <UserNav />
+            </div>
+          </header>
+          <main className="flex flex-1 flex-col gap-4 bg-secondary/50 p-4 pb-20 md:gap-8 md:p-8">
+            {children}
+          </main>
+          {isMobile && <BottomNavBar />}
+      </div>
+    </ActiveContextProvider>
   );
 }
