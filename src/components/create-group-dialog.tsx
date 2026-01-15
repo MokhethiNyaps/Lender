@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
-import { useUser, useFirestore, addDocumentNonBlocking } from '@/firebase';
+import { useUser, useFirestore, addDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
 import { collection, serverTimestamp, doc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -66,7 +66,9 @@ export function CreateGroupDialog({ isOpen, onOpenChange }: CreateGroupDialogPro
         }
       };
 
+      const groupDocRef = doc(firestore, 'groups', groupId);
       const userRoleContextsColRef = collection(firestore, 'user_role_contexts');
+
       const newRoleContext = {
         id: uuidv4(),
         userId: user.uid,
@@ -76,8 +78,8 @@ export function CreateGroupDialog({ isOpen, onOpenChange }: CreateGroupDialogPro
       };
       
       // Using non-blocking writes
-      await addDocumentNonBlocking(doc(firestore, 'groups', groupId), newGroup);
-      await addDocumentNonBlocking(userRoleContextsColRef, newRoleContext);
+      setDocumentNonBlocking(groupDocRef, newGroup, { merge: false });
+      addDocumentNonBlocking(userRoleContextsColRef, newRoleContext);
       
       toast({
         title: 'Group Created!',
