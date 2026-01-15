@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ChevronsUpDown, PlusCircle, User, Users } from "lucide-react"
+import { useUser } from "@/firebase"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,10 @@ interface ContextSwitcherProps extends PopoverTriggerProps {}
 export function ContextSwitcher({ className }: ContextSwitcherProps) {
   const [open, setOpen] = React.useState(false)
   const [selectedContext, setSelectedContext] = React.useState(groups[0].contexts[0])
+  const { user } = useUser();
+
+  // TODO: Replace with dynamic groups from user profile
+  const userGroups = user ? groups : [groups[0]];
 
   return (
     <div className="px-4">
@@ -66,7 +71,7 @@ export function ContextSwitcher({ className }: ContextSwitcherProps) {
         </PopoverTrigger>
         <PopoverContent className="w-[220px] p-0">
           <div className="p-1">
-            {groups.map((group) => (
+            {userGroups.map((group) => (
               <div key={group.label}>
                 <p className="p-2 text-xs font-medium text-muted-foreground">{group.label}</p>
                 {group.contexts.map((context) => (
@@ -85,11 +90,15 @@ export function ContextSwitcher({ className }: ContextSwitcherProps) {
                 ))}
               </div>
             ))}
-            <Separator className="my-1" />
-            <Button variant="ghost" className="w-full justify-start h-9">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Group
-            </Button>
+            {user && (
+              <>
+                <Separator className="my-1" />
+                <Button variant="ghost" className="w-full justify-start h-9">
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Create Group
+                </Button>
+              </>
+            )}
           </div>
         </PopoverContent>
       </Popover>
