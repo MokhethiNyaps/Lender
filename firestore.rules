@@ -94,6 +94,29 @@ service cloud.firestore {
       return isMember(doc) && doc.data.members[request.auth.uid] in roles;
     }
 
+    /**
+     * Checks if a user has access to a given context ID.
+     * A user has access if it's their own solo context or if they are a member of the group context.
+     */
+    function hasContextAccess(contextId) {
+      let isSoloOwner = isOwner(contextId);
+      let groupDoc = get(/databases/$(database)/documents/groups/$(contextId));
+      let isGroupMember = exists(/databases/$(database)/documents/groups/$(contextId)) && request.auth.uid in groupDoc.data.members;
+      return isSoloOwner || isGroupMember;
+    }
+
+    /**
+     * Checks if a user has management permissions over a context (for creating/editing loans/borrowers).
+     */
+    function canManageContext(contextId) {
+        let isSoloOwner = isOwner(contextId);
+        let groupDoc = get(/databases/$(database)/documents/groups/$(contextId));
+        let isGroupManager = exists(/databases/$(database)/documents/groups/$(contextId)) 
+                                && request.auth.uid in groupDoc.data.members
+                                && groupDoc.data.members[request.auth.uid] in ['owner', 'admin', 'treasurer'];
+        return isSoloOwner || isGroupManager;
+    }
+
     // ----------------------------------------------------------------------
     // User Data Collections
     // ----------------------------------------------------------------------
@@ -204,6 +227,26 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.members[request.auth.uid] == 'owner';
       allow update: if isExistingDoc() && isMemberWithRole(resource, ['owner', 'admin']);
       allow delete: if isExistingDoc() && isMemberWithRole(resource, ['owner']);
+    }
+
+    // ----------------------------------------------------------------------
+    // Core Financial Data Collections
+    // ----------------------------------------------------------------------
+    
+    /**
+     * @description Stores borrower information. Borrowers are entities tied to a specific
+     *              context (solo or group).
+     * @path /borrowers/{borrowerId}
+     * @allow (list) Any authenticated user can list borrowers, but the client MUST filter by a contextId they have access to.
+     * @allow (get) A user can read a borrower document if they have access to the contextId it belongs to.
+     * @allow (create) A user can create a borrower if they have management rights over the contextId.
+     */
+    match /borrowers/{borrowerId} {
+      allow get: if isSignedIn() && hasContextAccess(resource.data.contextId);
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && canManageContext(request.resource.data.contextId) && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSignedIn() && canManageContext(resource.data.contextId);
+      allow delete: if isSignedIn() && canManageContext(resource.data.contextId);
     }
   }
 }

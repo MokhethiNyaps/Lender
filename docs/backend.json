@@ -152,18 +152,72 @@
           "type": "string",
           "description": "A short description of the group."
         },
-         "members": {
-            "type": "object",
-            "description": "A map of user UIDs to their roles within the group for easy access control.",
-            "additionalProperties": {
-                "type": "string",
-                "enum": ["owner", "admin", "member"]
-            }
+        "members": {
+          "type": "object",
+          "description": "A map of user UIDs to their roles within the group for easy access control.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          }
         }
       },
       "required": [
         "id",
         "name"
+      ]
+    },
+    "Borrower": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Borrower",
+      "type": "object",
+      "description": "Represents an individual who can receive loans within a specific context.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Borrower entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Full name of the borrower."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Borrower's phone number."
+        },
+        "idNumber": {
+          "type": "string",
+          "description": "National or other official ID number for the borrower."
+        },
+        "contextId": {
+          "type": "string",
+          "description": "The ID of the Solo or Group context this borrower belongs to."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the borrower was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the borrower was last updated.",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "UID of the user who created this borrower record."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "contextId",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
       ]
     }
   },
@@ -271,6 +325,22 @@
             {
               "name": "userRoleContextId",
               "description": "The unique identifier for the user role context."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/borrowers/{borrowerId}",
+        "definition": {
+          "entityName": "Borrower",
+          "schema": {
+            "$ref": "#/backend/entities/Borrower"
+          },
+          "description": "Collection of all borrowers across all contexts.",
+          "params": [
+            {
+              "name": "borrowerId",
+              "description": "The unique identifier for the borrower."
             }
           ]
         }

@@ -9,7 +9,7 @@ import {
   Landmark,
   Users,
   BarChart3,
-  UserCircle,
+  UserSquare,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -22,9 +22,9 @@ import { ActiveContextProvider, useActiveContext } from '@/app/dashboard/active-
 const bottomNavLinks = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/dashboard/loans', label: 'Loans', icon: Landmark },
+  { href: '/dashboard/borrowers', label: 'Borrowers', icon: UserSquare },
   { href: '/dashboard/groups', label: 'Groups', icon: Users },
   { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/dashboard/profile', label: 'Profile', icon: UserCircle },
 ];
 
 function BottomNavBar() {
@@ -64,12 +64,15 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const { isReady } = useActiveContext();
 
   useEffect(() => {
-    if (!isUserLoading && !user) {
+    // Redirect to login page if auth check is complete and there's no user.
+    if (isReady && !user) {
       router.replace('/login');
     }
-  }, [user, isUserLoading, router]);
+  }, [user, isReady, router]);
 
   // Initialization Shield: Do not render children until the context is ready.
+  // This prevents any child components from attempting to fetch data with an
+  // uninitialized or invalid security context.
   if (!isReady || isUserLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
