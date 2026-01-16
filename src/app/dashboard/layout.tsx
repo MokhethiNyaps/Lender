@@ -17,7 +17,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { ActiveContextProvider } from '@/app/dashboard/active-context-provider';
+import { ActiveContextProvider, useActiveContext } from '@/app/dashboard/active-context-provider';
 
 const bottomNavLinks = [
   { href: '/dashboard', label: 'Home', icon: Home },
@@ -57,14 +57,11 @@ function BottomNavBar() {
   );
 }
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const { isReady } = useActiveContext();
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -72,39 +69,51 @@ export default function DashboardLayout({
     }
   }, [user, isUserLoading, router]);
 
-  if (isUserLoading || !user) {
+  // Initialization Shield: Do not render children until the context is ready.
+  if (!isReady || isUserLoading) {
     return (
-       <div className="flex h-screen w-full items-center justify-center">
-          <div className="h-16 w-16 animate-spin rounded-full border-4 border-dashed border-primary"></div>
-       </div>
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+        <div className="h-16 w-16 animate-spin rounded-full border-4 border-dashed border-primary"></div>
+        <p className="text-muted-foreground">Securing Connection...</p>
+      </div>
     );
   }
 
   return (
-    <ActiveContextProvider>
-      <div className="flex min-h-screen w-full flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
-            <div className="hidden md:block">
-              <Logo />
+    <div className="flex min-h-screen w-full flex-col">
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
+          <div className="hidden md:block">
+            <Logo />
+          </div>
+          <div className="md:hidden">
+            <ContextSwitcher />
+          </div>
+          <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
+            <div className="ml-auto flex-1 sm:flex-initial">
+              {/* Maybe a global search here */}
             </div>
-            <div className="md:hidden">
+            <div className="hidden md:block">
               <ContextSwitcher />
             </div>
-            <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
-              <div className="ml-auto flex-1 sm:flex-initial">
-                {/* Maybe a global search here */}
-              </div>
-              <div className="hidden md:block">
-                <ContextSwitcher />
-              </div>
-              <UserNav />
-            </div>
-          </header>
-          <main className="flex flex-1 flex-col gap-4 bg-secondary/50 p-4 pb-20 md:gap-8 md:p-8">
-            {children}
-          </main>
-          {isMobile && <BottomNavBar />}
-      </div>
+            <UserNav />
+          </div>
+        </header>
+        <main className="flex flex-1 flex-col gap-4 bg-secondary/50 p-4 pb-20 md:gap-8 md:p-8">
+          {children}
+        </main>
+        {isMobile && <BottomNavBar />}
+    </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ActiveContextProvider>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </ActiveContextProvider>
   );
 }

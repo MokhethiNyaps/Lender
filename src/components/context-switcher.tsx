@@ -1,10 +1,11 @@
+
 "use client"
 
 import * as React from "react"
 import { ChevronsUpDown, PlusCircle, User, Users } from "lucide-react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where } from "firebase/firestore"
-import { useActiveContext, soloContext, type ActiveContextType } from "@/app/dashboard/active-context-provider"
+import { useActiveContext, type ActiveContextType } from "@/app/dashboard/active-context-provider"
 import { CreateGroupDialog } from '@/components/create-group-dialog';
 
 import { cn } from "@/lib/utils"
@@ -22,7 +23,7 @@ export function ContextSwitcher() {
   const [isCreateGroupOpen, setCreateGroupOpen] = React.useState(false);
   const { user } = useUser();
   const firestore = useFirestore();
-  const { activeContext, setActiveContext } = useActiveContext();
+  const { activeContext, setActiveContext, soloContext } = useActiveContext();
 
   const handleContextSelect = (context: ActiveContextType) => {
     setActiveContext(context);
@@ -59,7 +60,7 @@ export function ContextSwitcher() {
     icon: Users
   })) : [];
   
-  if (isLoading) {
+  if (isLoading || !activeContext || !soloContext) {
     return <Skeleton className="h-9 w-full max-w-[220px]" />;
   }
   
