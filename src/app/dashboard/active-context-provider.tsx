@@ -14,12 +14,8 @@ export interface ActiveContextType {
   icon: LucideIcon;
 }
 
-interface ProviderState {
+interface ActiveContextProps {
   activeContext: ActiveContextType | null;
-  isReady: boolean;
-}
-
-interface ActiveContextProps extends ProviderState {
   setActiveContext: (context: ActiveContextType) => void;
   soloContext: ActiveContextType | null;
   borrowersQuery: Query<DocumentData> | null;
@@ -35,48 +31,25 @@ const ActiveContext = createContext<ActiveContextProps | undefined>(undefined);
 export const ActiveContextProvider = ({ children }: { children: ReactNode }) => {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
-
-  // Use a single state object for atomic updates
-  const [providerState, setProviderState] = useState<ProviderState>({
-    activeContext: null,
-    isReady: false,
-  });
+  const [activeContext, setActiveContextState] = useState<ActiveContextType | null>(null);
 
   // Extract primitive userId for stable dependencies
   const userId = user?.uid || null;
 
-  // This effect now ONLY depends on primitive, stable values.
-  // It is the heart of the Zero-Churn architecture.
+  // This effect sets the initial solo context once the user is loaded.
   useEffect(() => {
-    if (isUserLoading) {
-      return; // Wait until Firebase has determined the auth state.
-    }
-
-    if (userId) {
-      // User is logged in. Create the initial solo context.
+    if (!isUserLoading && userId && !activeContext) {
       const newSoloContext: ActiveContextType = {
         id: userId,
         type: 'solo',
         label: 'Solo Lender',
         icon: UserIcon,
       };
-      
-      // Atomic update: Set context and readiness in a single operation.
-      // This runs only when the user's auth state truly changes.
-      setProviderState(prevState => {
-         // Only set the initial context if one isn't already active.
-         // This preserves a user's selected group context across hot-reloads.
-        if (!prevState.activeContext) {
-             return { activeContext: newSoloContext, isReady: true };
-        }
-        return { ...prevState, isReady: true };
-      });
-
-    } else {
-      // No user is logged in. Auth check is complete.
-      setProviderState({ activeContext: null, isReady: true });
+      setActiveContextState(newSoloContext);
+    } else if (!userId) {
+      setActiveContextState(null);
     }
-  }, [userId, isUserLoading]);
+  }, [userId, isUserLoading, activeContext]);
 
 
   const soloContext = useMemo<ActiveContextType | null>(() => {
@@ -92,12 +65,12 @@ export const ActiveContextProvider = ({ children }: { children: ReactNode }) => 
 
   // Manual context setting for the switcher
   const setActiveContext = (context: ActiveContextType) => {
-    setProviderState(prevState => ({ ...prevState, activeContext: context }));
+    setActiveContextState(context);
   };
 
   // --- Hard-Anchored Architecture ---
   // All queries are anchored directly to the primitive `userId`.
-  // They do not depend on `activeContext` or any other derived state.
+  // They are guaranteed to be null until the user ID is available.
 
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
@@ -116,13 +89,13 @@ export const ActiveContextProvider = ({ children }: { children: ReactNode }) => 
 
 
   const value = useMemo(() => ({
-    ...providerState,
+    activeContext,
     setActiveContext,
     soloContext,
     borrowersQuery,
     loansQuery,
     ledgerQuery,
-  }), [providerState, soloContext, borrowersQuery, loansQuery, ledgerQuery]);
+  }), [activeContext, soloContext, borrowersQuery, loansQuery, ledgerQuery]);
 
 
   return (
@@ -142,5 +115,3 @@ export const useActiveContext = () => {
   }
   return context;
 };
-
-    

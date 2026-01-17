@@ -61,19 +61,17 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const { isReady } = useActiveContext();
-
+  
   useEffect(() => {
     // Redirect to login page if auth check is complete and there's no user.
-    if (isReady && !user) {
+    if (!isUserLoading && !user) {
       router.replace('/login');
     }
-  }, [user, isReady, router]);
+  }, [user, isUserLoading, router]);
 
-  // Initialization Shield: Do not render children until the context is ready.
-  // This prevents any child components from attempting to fetch data with an
-  // uninitialized or invalid security context.
-  if (!isReady || isUserLoading) {
+  // Initialization Shield: Do not render children until Firebase has confirmed the auth state.
+  // This is the single source of truth for readiness.
+  if (isUserLoading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
         <div className="h-16 w-16 animate-spin rounded-full border-4 border-dashed border-primary"></div>
@@ -81,8 +79,10 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
-  return (
+  
+  // Render children only if we are done loading and have a user.
+  // The useEffect above will handle the redirection for non-users.
+  return user ? (
     <div className="flex min-h-screen w-full flex-col">
       <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:px-6">
           <div className="hidden md:block">
@@ -106,7 +106,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </main>
         {isMobile && <BottomNavBar />}
     </div>
-  );
+  ) : null; // Render nothing if there's no user, redirection is in flight.
 }
 
 export default function DashboardLayout({
