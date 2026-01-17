@@ -23,6 +23,8 @@ interface ActiveContextProps extends ProviderState {
   setActiveContext: (context: ActiveContextType) => void;
   soloContext: ActiveContextType | null;
   borrowersQuery: Query<DocumentData> | null;
+  loansQuery: Query<DocumentData> | null;
+  ledgerQuery: Query<DocumentData> | null;
 }
 
 const ActiveContext = createContext<ActiveContextProps | undefined>(undefined);
@@ -93,19 +95,24 @@ export const ActiveContextProvider = ({ children }: { children: ReactNode }) => 
     setProviderState(prevState => ({ ...prevState, activeContext: context }));
   };
 
-  // --- Authorized Data Stream (The "Dead-Bolt") ---
-  const { activeContext, isReady } = providerState;
-  const borrowersQuery = useMemoFirebase(() => {
-    const contextId = activeContext?.id;
+  // --- Hard-Anchored Architecture ---
+  // All queries are anchored directly to the primitive `userId`.
+  // They do not depend on `activeContext` or any other derived state.
 
-    // Guard: Do not create a query until initialization is complete AND context ID is valid.
-    // The query is memoized based on the primitive `contextId` string, ensuring stability.
-    if (!isReady || !contextId || !firestore) {
-      return null;
-    }
-    
-    return query(collection(firestore, 'borrowers'), where('contextId', '==', contextId));
-  }, [firestore, isReady, activeContext?.id]);
+  const borrowersQuery = useMemoFirebase(() => {
+    if (!firestore || !userId) return null;
+    return query(collection(firestore, 'borrowers'), where('contextId', '==', userId));
+  }, [firestore, userId]);
+
+  const loansQuery = useMemoFirebase(() => {
+    if (!firestore || !userId) return null;
+    return query(collection(firestore, 'loans'), where('contextId', '==', userId));
+  }, [firestore, userId]);
+
+  const ledgerQuery = useMemoFirebase(() => {
+    if (!firestore || !userId) return null;
+    return query(collection(firestore, 'ledger'), where('contextId', '==', userId));
+  }, [firestore, userId]);
 
 
   const value = useMemo(() => ({
@@ -113,7 +120,9 @@ export const ActiveContextProvider = ({ children }: { children: ReactNode }) => 
     setActiveContext,
     soloContext,
     borrowersQuery,
-  }), [providerState, soloContext, borrowersQuery]);
+    loansQuery,
+    ledgerQuery,
+  }), [providerState, soloContext, borrowersQuery, loansQuery, ledgerQuery]);
 
 
   return (
@@ -133,3 +142,5 @@ export const useActiveContext = () => {
   }
   return context;
 };
+
+    

@@ -219,6 +219,143 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "Loan": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Loan",
+      "type": "object",
+      "description": "Represents a loan given to a borrower within a specific context.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Loan entity."
+        },
+        "borrowerId": {
+          "type": "string",
+          "description": "Reference to the Borrower entity."
+        },
+        "borrowerName": {
+          "type": "string",
+          "description": "Denormalized name of the borrower for easy display."
+        },
+        "contextId": {
+          "type": "string",
+          "description": "The ID of the Solo or Group context this loan belongs to."
+        },
+        "principal": {
+          "type": "number",
+          "description": "The initial amount of the loan."
+        },
+        "interestType": {
+          "type": "string",
+          "enum": ["FLAT_FEE", "PERCENTAGE_MONTHLY"],
+          "description": "The model used to calculate interest."
+        },
+        "interestValue": {
+           "type": "number",
+           "description": "The value used for interest calculation (e.g., fee amount or percentage)."
+        },
+        "repaymentModel": {
+          "type": "string",
+          "enum": ["INTEREST_ONLY", "FIXED_TOTAL"],
+          "description": "The model for how the loan is to be repaid."
+        },
+        "totalRepaymentAmount": {
+          "type": "number",
+          "description": "The total amount expected to be repaid (principal + interest)."
+        },
+        "amountPaid": {
+           "type": "number",
+           "description": "The total amount paid back so far."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["ACTIVE", "PAID", "OVERDUE", "DEFAULTED"],
+          "description": "The current status of the loan."
+        },
+        "disbursedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the loan was disbursed."
+        },
+         "dueDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date the next payment is due."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "borrowerId",
+        "contextId",
+        "principal",
+        "interestType",
+        "repaymentModel",
+        "totalRepaymentAmount",
+        "status",
+        "createdAt",
+        "updatedAt",
+        "createdBy"
+      ]
+    },
+    "LedgerEntry": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LedgerEntry",
+      "type": "object",
+      "description": "An immutable financial record. Represents a single transaction.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "loanId": {
+          "type": "string",
+          "description": "The loan this entry is associated with."
+        },
+        "contextId": {
+          "type": "string",
+          "description": "The context this entry belongs to."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["DISBURSEMENT", "REPAYMENT", "FEE"],
+          "description": "The type of transaction."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The value of the transaction."
+        },
+        "transactionDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "loanId",
+        "contextId",
+        "type",
+        "amount",
+        "transactionDate",
+        "createdBy"
+      ]
     }
   },
   "auth": {
@@ -344,8 +481,42 @@
             }
           ]
         }
+      },
+       {
+        "path": "/loans/{loanId}",
+        "definition": {
+          "entityName": "Loan",
+          "schema": {
+            "$ref": "#/backend/entities/Loan"
+          },
+          "description": "Collection of all loans across all contexts.",
+          "params": [
+            {
+              "name": "loanId",
+              "description": "The unique identifier for the loan."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/ledger/{ledgerEntryId}",
+        "definition": {
+          "entityName": "LedgerEntry",
+          "schema": {
+            "$ref": "#/backend/entities/LedgerEntry"
+          },
+          "description": "Append-only log of all financial transactions.",
+          "params": [
+            {
+              "name": "ledgerEntryId",
+              "description": "The unique identifier for the ledger entry."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore structure is designed to support Lenda's core features with a focus on security, scalability, and debuggability. It adheres to the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters).  Authorization Independence is achieved by denormalizing role information into documents where authorization is required, avoiding `get()` calls in security rules. Structural Segregation is applied by separating data with different access needs into distinct collections. Access Modeling follows a consistent pattern of using hierarchical paths for user-owned data and membership maps for collaborative data.\n\nSpecifically:\n\n*   `/users/{userId}` and `/users/{userId}/userProfiles/{userProfileId}`:  Uses path-based ownership for user data. This structure simplifies security rules based on user identity.\n*   `/solos/{soloId}`: Represents individual lending contexts. The `members` map is denormalized into each document, enabling authorization independence for solo-related operations. Security rules can directly check membership without needing to fetch parent document data.\n*   `/groups/{groupId}`: Represents group lending contexts.  Similar to Solos, a `members` map is denormalized into each group document. This allows security rules to efficiently validate membership for group-related operations.\n*   `/roles_admin/{userId}`: Represents a user with admin privileges. An existence check is sufficient for global admin privileges.\n*   `/user_role_contexts/{userRoleContextId}`: Represents the roles a user has in the group or solo context.\n\nThis structure supports QAPs by enabling secure `list` operations. For example, listing solos or groups only requires checking the `members` map in each document against the requesting user's ID, without needing to filter based on data content."
   }
 }
+
+    

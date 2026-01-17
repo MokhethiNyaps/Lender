@@ -99,23 +99,15 @@ service cloud.firestore {
      * A user has access if it's their own solo context or if they are a member of the group context.
      */
     function hasContextAccess(contextId) {
-      let isSoloOwner = isOwner(contextId);
+      // For Solo contexts, the contextId IS the userId.
+      if (isOwner(contextId)) {
+        return true;
+      }
+      // For Group contexts, check the members map of the group document.
       let groupDoc = get(/databases/$(database)/documents/groups/$(contextId));
-      let isGroupMember = exists(/databases/$(database)/documents/groups/$(contextId)) && request.auth.uid in groupDoc.data.members;
-      return isSoloOwner || isGroupMember;
+      return exists(/databases/$(database)/documents/groups/$(contextId)) && request.auth.uid in groupDoc.data.members;
     }
-
-    /**
-     * Checks if a user has management permissions over a context (for creating/editing loans/borrowers).
-     */
-    function canManageContext(contextId) {
-        let isSoloOwner = isOwner(contextId);
-        let groupDoc = get(/databases/$(database)/documents/groups/$(contextId));
-        let isGroupManager = exists(/databases/$(database)/documents/groups/$(contextId)) 
-                                && request.auth.uid in groupDoc.data.members
-                                && groupDoc.data.members[request.auth.uid] in ['owner', 'admin', 'treasurer'];
-        return isSoloOwner || isGroupManager;
-    }
+    
 
     // ----------------------------------------------------------------------
     // User Data Collections
@@ -234,19 +226,44 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
     
     /**
-     * @description Stores borrower information. Borrowers are entities tied to a specific
-     *              context (solo or group).
+     * @description Stores borrower information. Borrowers are tied to a context.
      * @path /borrowers/{borrowerId}
-     * @allow (list) Any authenticated user can list borrowers, but the client MUST filter by a contextId they have access to.
+     * @allow (list) Enforces that a list query MUST be filtered by a contextId that equals the user's UID. Prevents unscoped reads.
      * @allow (get) A user can read a borrower document if they have access to the contextId it belongs to.
-     * @allow (create) A user can create a borrower if they have management rights over the contextId.
+     * @allow (create) A user can create a borrower if they own the contextId.
      */
     match /borrowers/{borrowerId} {
       allow get: if isSignedIn() && hasContextAccess(resource.data.contextId);
-      allow list: if isSignedIn();
-      allow create: if isSignedIn() && canManageContext(request.resource.data.contextId) && request.resource.data.createdBy == request.auth.uid;
-      allow update: if isSignedIn() && canManageContext(resource.data.contextId);
-      allow delete: if isSignedIn() && canManageContext(resource.data.contextId);
+      allow list: if isSignedIn() && request.query.filters.contextId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid && request.resource.data.contextId == request.auth.uid;
+      allow update, delete: if isSignedIn() && hasContextAccess(resource.data.contextId);
+    }
+    
+    /**
+     * @description Stores loan information. Loans are tied to a context.
+     * @path /loans/{loanId}
+     * @allow (list) Enforces that a list query MUST be filtered by a contextId that equals the user's UID. Prevents unscoped reads.
+     * @allow (get) A user can read a loan if they have access to the contextId it belongs to.
+     * @allow (create) A user can create a loan if they own the contextId.
+     */
+    match /loans/{loanId} {
+      allow get: if isSignedIn() && hasContextAccess(resource.data.contextId);
+      allow list: if isSignedIn() && request.query.filters.contextId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid && request.resource.data.contextId == request.auth.uid;
+      allow update, delete: if isSignedIn() && hasContextAccess(resource.data.contextId);
+    }
+    
+    /**
+     * @description Append-only ledger for all financial transactions.
+     * @path /ledger/{ledgerEntryId}
+     * @allow (create) Any signed-in user can create a ledger entry, assuming it's part of a valid workflow (e.g., creating a loan).
+     * @deny (read, update, delete) The ledger is immutable from the client-side to ensure integrity.
+     */
+    match /ledger/{ledgerEntryId} {
+      allow read, update, delete: if false;
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid && request.resource.data.contextId == request.auth.uid;
     }
   }
 }
+
+    
