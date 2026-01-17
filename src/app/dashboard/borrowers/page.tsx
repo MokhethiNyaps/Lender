@@ -20,10 +20,8 @@ export default function BorrowersPage() {
   const { borrowersQuery, activeContext } = useActiveContext();
   const [isAddBorrowerOpen, setAddBorrowerOpen] = useState(false);
 
-  // The "Dead-Bolt" Guard: Do not even attempt to call useCollection until the query is valid.
+  // The "Dead-Bolt" Guard: Do not attempt to fetch data until the query is valid.
   if (!borrowersQuery) {
-    // This state occurs when the context is not ready yet. 
-    // The main layout shield shows a full-page loader. This is a secondary, local guard.
     return <LoadingScreen />;
   }
 
