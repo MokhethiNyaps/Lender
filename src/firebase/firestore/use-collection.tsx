@@ -47,12 +47,17 @@ export interface InternalQuery extends Query<DocumentData> {
  * references
  *  
  * @template T Optional type for document data. Defaults to any.
- * @param {CollectionReference<DocumentData> | Query<DocumentData> | null | undefined} targetRefOrQuery -
+ * @param {QueryWithAuth<T> | null | undefined} targetRefOrQuery -
  * The Firestore CollectionReference or Query. Waits if null/undefined.
  * @returns {UseCollectionResult<T>} Object with data, isLoading, error.
  */
+export interface QueryWithAuth<T> extends Query<DocumentData> {
+  __memo?: boolean;
+  __authResolved?: boolean; // New flag to indicate auth state is resolved
+}
+
 export function useCollection<T = any>(
-    memoizedTargetRefOrQuery: ((CollectionReference<DocumentData> | Query<DocumentData>) & {__memo?: boolean})  | null | undefined,
+    memoizedTargetRefOrQuery: QueryWithAuth<T> | null | undefined,
 ): UseCollectionResult<T> {
   type ResultItemType = WithId<T>;
   type StateDataType = ResultItemType[] | null;
@@ -62,7 +67,8 @@ export function useCollection<T = any>(
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
-    if (!memoizedTargetRefOrQuery) {
+    // Check for both a valid query and an authenticated user
+    if (!memoizedTargetRefOrQuery || !memoizedTargetRefOrQuery.__authResolved) {
       setData(null);
       setIsLoading(false);
       setError(null);

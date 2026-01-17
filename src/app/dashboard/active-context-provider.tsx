@@ -30,6 +30,7 @@ const ActiveContext = createContext<ActiveContextProps | undefined>(undefined);
 
 export const ActiveContextProvider = ({ children }: { children: ReactNode }) => {
   const { user, isUserLoading } = useUser();
+  const authResolved = !isUserLoading && !!user;
   const firestore = useFirestore();
   const [activeContext, setActiveContextState] = useState<ActiveContextType | null>(null);
 
@@ -74,18 +75,24 @@ export const ActiveContextProvider = ({ children }: { children: ReactNode }) => 
 
   const borrowersQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
-    return query(collection(firestore, 'borrowers'), where('contextId', '==', userId));
-  }, [firestore, userId]);
+    const q = query(collection(firestore, 'borrowers'), where('contextId', '==', userId));
+    (q as any).__authResolved = authResolved;
+    return q;
+  }, [firestore, userId, authResolved]);
 
   const loansQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
-    return query(collection(firestore, 'loans'), where('contextId', '==', userId));
-  }, [firestore, userId]);
+    const q = query(collection(firestore, 'loans'), where('contextId', '==', userId));
+    (q as any).__authResolved = authResolved;
+    return q;
+  }, [firestore, userId, authResolved]);
 
   const ledgerQuery = useMemoFirebase(() => {
     if (!firestore || !userId) return null;
-    return query(collection(firestore, 'ledger'), where('contextId', '==', userId));
-  }, [firestore, userId]);
+    const q = query(collection(firestore, 'ledger'), where('contextId', '==', userId));
+    (q as any).__authResolved = authResolved;
+    return q;
+  }, [firestore, userId, authResolved]);
 
 
   const value = useMemo(() => ({
